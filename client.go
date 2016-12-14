@@ -86,7 +86,7 @@ func (c *Client) Upload() error {
 		if ok {
 			c.config.Logger.Printf("resuming upload of '%s'.\n", c.filename)
 
-			offset, err := c.uploadOffset(f, url)
+			offset, err := c.uploadOffset(url)
 
 			if err != nil {
 				return err
@@ -138,7 +138,7 @@ func (c *Client) create(f *os.File) (string, error) {
 	req, err := http.NewRequest("POST", c.url, nil)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to create upload of '%s': %s", err)
+		return "", fmt.Errorf("failed to create upload of '%s': %s", c.filename, err)
 	}
 
 	req.Header.Set("Content-Length", "0")
@@ -149,18 +149,18 @@ func (c *Client) create(f *os.File) (string, error) {
 	res, err := c.client.Do(req)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to create upload of '%s': %s", fileInfo.Name(), err)
+		return "", fmt.Errorf("failed to create upload of '%s': %s", c.filename, err)
 	}
 
 	switch res.StatusCode {
 	case 201:
 		return res.Header.Get("Location"), nil
 	case 412:
-		return "", fmt.Errorf("failed to create upload of '%s': this client is incompatible with Tus sever version %s.", fileInfo.Name(), res.Header.Get("Tus-Version"))
+		return "", fmt.Errorf("failed to create upload of '%s': this client is incompatible with Tus sever version %s.", c.filename, res.Header.Get("Tus-Version"))
 	case 413:
-		return "", fmt.Errorf("failed to create upload of '%s': upload file is to large.", fileInfo.Name())
+		return "", fmt.Errorf("failed to create upload of '%s': upload file is to large.", c.filename)
 	default:
-		return "", fmt.Errorf("failed to create upload of '%s': %d", fileInfo.Name(), res.StatusCode)
+		return "", fmt.Errorf("failed to create upload of '%s': %d", c.filename, res.StatusCode)
 	}
 }
 
@@ -181,14 +181,14 @@ func (c *Client) upload(f *os.File, url string, offset int64) error {
 		_, err := f.Seek(offset, 0)
 
 		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", fileInfo.Name(), err)
+			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
 		}
 
 		data := make([]byte, c.config.ChunkSize)
 		size, err := f.Read(data)
 
 		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", fileInfo.Name(), err)
+			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
 		}
 
 		method := "PATCH"
@@ -200,7 +200,7 @@ func (c *Client) upload(f *os.File, url string, offset int64) error {
 		req, err := http.NewRequest(method, url, bytes.NewBuffer(data[:size]))
 
 		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", fileInfo.Name(), err)
+			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
 		}
 
 		req.Header.Set("Content-Type", "application/offset+octet-stream")
@@ -215,7 +215,7 @@ func (c *Client) upload(f *os.File, url string, offset int64) error {
 		res, err := c.client.Do(req)
 
 		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", err)
+			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
 		}
 
 		switch res.StatusCode {
@@ -223,33 +223,27 @@ func (c *Client) upload(f *os.File, url string, offset int64) error {
 			offset, err = strconv.ParseInt(res.Header.Get("Upload-Offset"), 10, 64)
 
 			if err != nil {
-				return fmt.Errorf("failed to upload '%s': can't parse upload offset.", fileInfo.Name())
+				return fmt.Errorf("failed to upload '%s': can't parse upload offset.", c.filename)
 			}
 		case 409:
-			return fmt.Errorf("failed to upload '%s': upload offset doesn't match.", fileInfo.Name())
+			return fmt.Errorf("failed to upload '%s': upload offset doesn't match.", c.filename)
 		case 412:
-			return fmt.Errorf("failed to upload '%s': this client is incompatible with Tus server version %s.", fileInfo.Name(), res.Header.Get("Tus-Version"))
+			return fmt.Errorf("failed to upload '%s': this client is incompatible with Tus server version %s.", c.filename, res.Header.Get("Tus-Version"))
 		case 413:
-			return fmt.Errorf("failed to upload '%s': upload file is to large.", fileInfo.Name())
+			return fmt.Errorf("failed to upload '%s': upload file is to large.", c.filename)
 		default:
-			return fmt.Errorf("failed to upload '%s': %d", fileInfo.Name(), res.StatusCode)
+			return fmt.Errorf("failed to upload '%s': %d", c.filename, res.StatusCode)
 		}
 	}
 
 	return nil
 }
 
-func (c *Client) uploadOffset(f *os.File, url string) (int64, error) {
-	fileInfo, err := f.Stat()
-
-	if err != nil {
-		return 0, err
-	}
-
+func (c *Client) uploadOffset(url string) (int64, error) {
 	req, err := http.NewRequest("HEAD", url, nil)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to resume upload of '%s': %s", err)
+		return 0, fmt.Errorf("failed to resume upload of '%s': %s", c.filename, err)
 	}
 
 	req.Header.Set("Tus-Resumable", c.protocolVersion)
@@ -257,7 +251,7 @@ func (c *Client) uploadOffset(f *os.File, url string) (int64, error) {
 	res, err := c.client.Do(req)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to resume upload of '%s': %s", fileInfo.Name(), err)
+		return 0, fmt.Errorf("failed to resume upload of '%s': %s", c.filename, err)
 	}
 
 	switch res.StatusCode {
@@ -267,14 +261,14 @@ func (c *Client) uploadOffset(f *os.File, url string) (int64, error) {
 		if err == nil {
 			return i, nil
 		} else {
-			return 0, fmt.Errorf("failed to resume upload of '%s': can't parse upload offset.", fileInfo.Name())
+			return 0, fmt.Errorf("failed to resume upload of '%s': can't parse upload offset.", c.filename)
 		}
 	case 403, 404, 410:
 		// file doesn't exists.
 		return -1, nil
 	case 412:
-		return 0, fmt.Errorf("failed to resume upload of '%s': this client is incompatible with Tus server version %s.", fileInfo.Name(), res.Header.Get("Tus-Version"))
+		return 0, fmt.Errorf("failed to resume upload of '%s': this client is incompatible with Tus server version %s.", c.filename, res.Header.Get("Tus-Version"))
 	default:
-		return 0, fmt.Errorf("failed to resume upload of '%s': %d", fileInfo.Name(), res.StatusCode)
+		return 0, fmt.Errorf("failed to resume upload of '%s': %d", c.filename, res.StatusCode)
 	}
 }

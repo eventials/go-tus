@@ -12,16 +12,16 @@ import (
 // Config provides a way to configure the Client depending on your needs.
 type Config struct {
 	// ChunkSize divide the file into chunks.
-	ChunkSize           int64
+	ChunkSize int64
 	// Resume enables resumable upload.
-	Resume              bool
+	Resume bool
 	// OverridePatchMethod allow to by pass proxies sendind a POST request instead of PATCH.
 	OverridePatchMethod bool
 	// Storage is the backend to save upload progress.
 	// If Resume is true the Storage is required.
-	Storage             storage.Storage
+	Storage storage.Storage
 	// Logger is the logger to use internally, mostly for upload progress.
-	Logger              *log.Logger
+	Logger *log.Logger
 }
 
 // DefaultConfig return the default Client configuration.
