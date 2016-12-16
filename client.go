@@ -1,257 +1,197 @@
-// Package tus provides a client to tus protocol version 1.0.0.
-//
-// tus is a protocol based on HTTP for resumable file uploads. Resumable means that
-// an upload can be interrupted at any moment and can be resumed without
-// re-uploading the previous data again. An interruption may happen willingly, if
-// the user wants to pause, or by accident in case of an network issue or server
-// outage (http://tus.io).
 package tus
 
 import (
-	"bytes"
 	"fmt"
-	"math"
+	"io"
 	"net/http"
-	"os"
 	"strconv"
+)
+
+const (
+	ProtocolVersion = "1.0.0"
 )
 
 // Client represents the tus client.
 // You can use it in goroutines to create parallels uploads.
 type Client struct {
-	config          *Config
-	client          *http.Client
-	aborted         bool
-	filename        string
-	url             string
-	protocolVersion string
+	Config  *Config
+	Url     string
+	Version string
+
+	client *http.Client
 }
 
 // NewClient creates a new tus client.
-func NewClient(url, filename string, config *Config) (*Client, error) {
-	fi, err := os.Stat(filename)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if fi.IsDir() {
-		return nil, fmt.Errorf("'%s' is a directory.", filename)
-	}
-
+func NewClient(url string, config *Config) (*Client, error) {
 	if config == nil {
 		config = DefaultConfig()
 	} else {
-		if err = config.Validate(); err != nil {
+		if err := config.Validate(); err != nil {
 			return nil, err
 		}
 	}
 
 	return &Client{
-		config:          config,
-		client:          &http.Client{},
-		aborted:         false,
-		filename:        filename,
-		url:             url,
-		protocolVersion: "1.0.0",
+		Config:  config,
+		Url:     url,
+		Version: ProtocolVersion,
+
+		client: &http.Client{},
 	}, nil
 }
 
-// Upload start the uploading process.
-// If resume is enabled and part of the file was uploaded, it will resume the upload.
-func (c *Client) Upload() error {
-	c.config.Logger.Printf("processing upload of '%s'.\n", c.filename)
+func (c *Client) Do(req *http.Request) (*http.Response, error) {
+	req.Header.Set("Tus-Resumable", ProtocolVersion)
 
-	c.aborted = false
-
-	f, err := os.Open(c.filename)
-
-	if err != nil {
-		return err
-	}
-
-	defer f.Close()
-
-	defer func() {
-		if c.config.Resume && !c.aborted {
-			c.config.Storage.Delete(f)
-		}
-	}()
-
-	if c.config.Resume {
-		c.config.Logger.Printf("checking if can resume upload of '%s'.\n", c.filename)
-
-		url, ok := c.config.Storage.Get(f)
-
-		if ok {
-			c.config.Logger.Printf("resuming upload of '%s'.\n", c.filename)
-
-			offset, err := c.uploadOffset(url)
-
-			if err != nil {
-				return err
-			}
-
-			if offset != -1 {
-				return c.upload(f, url, offset)
-			}
-		}
-	}
-
-	url, err := c.create(f)
-
-	if err != nil {
-		return err
-	}
-
-	c.config.Logger.Printf("starting upload of '%s'.\n", c.filename)
-
-	if c.config.Resume {
-		c.config.Storage.Set(f, url)
-	}
-
-	err = c.upload(f, url, 0)
-
-	if err == nil {
-		c.config.Logger.Printf("upload of '%s' completed.\n", c.filename)
-	} else {
-		c.config.Logger.Printf("upload of '%s' failed.\n", c.filename)
-	}
-
-	return err
+	return c.client.Do(req)
 }
 
-// Abort stop the upload process.
-// If resume is enabled you can continue the upload later.
-func (c *Client) Abort() {
-	c.config.Logger.Printf("aborting upload of '%s'.\n", c.filename)
-	c.aborted = true
-}
-
-func (c *Client) create(f *os.File) (string, error) {
-	fileInfo, err := f.Stat()
-
-	if err != nil {
-		return "", err
+// CreateUpload creates a new upload in the server.
+func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
+	if u == nil {
+		return nil, ErrNilUpload
 	}
 
-	req, err := http.NewRequest("POST", c.url, nil)
+	if c.Config.Resume && len(u.Fingerprint) == 0 {
+		return nil, ErrFingerprintNotSet
+	}
+
+	req, err := http.NewRequest("POST", c.Url, nil)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to create upload of '%s': %s", c.filename, err)
+		return nil, err
 	}
 
 	req.Header.Set("Content-Length", "0")
-	req.Header.Set("Upload-Length", strconv.FormatInt(fileInfo.Size(), 10))
-	req.Header.Set("Tus-Resumable", c.protocolVersion)
-	req.Header.Set("Upload-Metadata", fmt.Sprintf("filename %s", b64encode(fileInfo.Name())))
+	req.Header.Set("Upload-Length", strconv.FormatInt(u.size, 10))
+	req.Header.Set("Upload-Metadata", u.EncodedMetadata())
 
-	res, err := c.client.Do(req)
+	res, err := c.Do(req)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to create upload of '%s': %s", c.filename, err)
+		return nil, err
 	}
 
 	switch res.StatusCode {
 	case 201:
-		return res.Header.Get("Location"), nil
+		url := res.Header.Get("Location")
+
+		if c.Config.Resume {
+			c.Config.Store.Set(u.Fingerprint, url)
+		}
+
+		return NewUploader(c, url, u, 0), nil
 	case 412:
-		return "", fmt.Errorf("failed to create upload of '%s': this client is incompatible with Tus sever version %s.", c.filename, res.Header.Get("Tus-Version"))
+		return nil, ErrVersionMismatch
 	case 413:
-		return "", fmt.Errorf("failed to create upload of '%s': upload file is to large.", c.filename)
+		return nil, ErrLargeUpload
 	default:
-		return "", fmt.Errorf("failed to create upload of '%s': %d", c.filename, res.StatusCode)
+		return nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 }
 
-func (c *Client) upload(f *os.File, url string, offset int64) error {
-	fileInfo, err := f.Stat()
+// ResumeUpload resumes the upload if already created, otherwise it will return an error.
+func (c *Client) ResumeUpload(u *Upload) (*Uploader, error) {
+	if u == nil {
+		return nil, ErrNilUpload
+	}
+
+	if !c.Config.Resume {
+		return nil, ErrResumeNotEnabled
+	} else if len(u.Fingerprint) == 0 {
+		return nil, ErrFingerprintNotSet
+	}
+
+	url, found := c.Config.Store.Get(u.Fingerprint)
+
+	if !found {
+		return nil, ErrUploadNotFound
+	}
+
+	offset, err := c.getUploadOffset(url)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fileSize := fileInfo.Size()
-	totalParts := math.Ceil(float64(fileSize) / float64(c.config.ChunkSize))
-
-	for offset < fileSize && !c.aborted {
-		currentPart := math.Ceil(float64(offset) / float64(c.config.ChunkSize))
-		c.config.Logger.Printf("uploading file '%s' (%g/%g).\n", c.filename, currentPart+1, totalParts)
-
-		_, err := f.Seek(offset, 0)
-
-		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
-		}
-
-		data := make([]byte, c.config.ChunkSize)
-		size, err := f.Read(data)
-
-		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
-		}
-
-		method := "PATCH"
-
-		if c.config.OverridePatchMethod {
-			method = "POST"
-		}
-
-		req, err := http.NewRequest(method, url, bytes.NewBuffer(data[:size]))
-
-		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
-		}
-
-		req.Header.Set("Content-Type", "application/offset+octet-stream")
-		req.Header.Set("Content-Length", strconv.Itoa(size))
-		req.Header.Set("Upload-Offset", strconv.FormatInt(offset, 10))
-		req.Header.Set("Tus-Resumable", c.protocolVersion)
-
-		if c.config.OverridePatchMethod {
-			req.Header.Set("X-HTTP-Method-Override", "PATCH")
-		}
-
-		res, err := c.client.Do(req)
-
-		if err != nil {
-			return fmt.Errorf("failed to upload '%s': %s", c.filename, err)
-		}
-
-		switch res.StatusCode {
-		case 204:
-			offset, err = strconv.ParseInt(res.Header.Get("Upload-Offset"), 10, 64)
-
-			if err != nil {
-				return fmt.Errorf("failed to upload '%s': can't parse upload offset.", c.filename)
-			}
-		case 409:
-			return fmt.Errorf("failed to upload '%s': upload offset doesn't match.", c.filename)
-		case 412:
-			return fmt.Errorf("failed to upload '%s': this client is incompatible with Tus server version %s.", c.filename, res.Header.Get("Tus-Version"))
-		case 413:
-			return fmt.Errorf("failed to upload '%s': upload file is to large.", c.filename)
-		default:
-			return fmt.Errorf("failed to upload '%s': %d", c.filename, res.StatusCode)
-		}
-	}
-
-	return nil
+	return NewUploader(c, url, u, offset), nil
 }
 
-func (c *Client) uploadOffset(url string) (int64, error) {
+// CreateOrResumeUpload resumes the upload if already created or creates a new upload in the server.
+func (c *Client) CreateOrResumeUpload(u *Upload) (*Uploader, error) {
+	if u == nil {
+		return nil, ErrNilUpload
+	}
+
+	uploader, err := c.ResumeUpload(u)
+
+	if err == nil {
+		return uploader, err
+	} else if (err == ErrResumeNotEnabled) || (err == ErrUploadNotFound) {
+		return c.CreateUpload(u)
+	}
+
+	return nil, err
+}
+
+func (c *Client) uploadChunck(url string, body io.Reader, size int64, offset int64) (int64, error) {
+	var method string
+
+	if !c.Config.OverridePatchMethod {
+		method = "PATCH"
+	} else {
+		method = "POST"
+	}
+
+	req, err := http.NewRequest(method, url, body)
+
+	if err != nil {
+		return -1, fmt.Errorf("failed to upload: %s", err)
+	}
+
+	req.Header.Set("Content-Type", "application/offset+octet-stream")
+	req.Header.Set("Content-Length", strconv.FormatInt(size, 10))
+	req.Header.Set("Upload-Offset", strconv.FormatInt(offset, 10))
+
+	if c.Config.OverridePatchMethod {
+		req.Header.Set("X-HTTP-Method-Override", "PATCH")
+	}
+
+	res, err := c.Do(req)
+
+	if err != nil {
+		return -1, err
+	}
+
+	switch res.StatusCode {
+	case 204:
+		if newOffset, err := strconv.ParseInt(res.Header.Get("Upload-Offset"), 10, 64); err == nil {
+			return newOffset, nil
+		} else {
+			return -1, err
+		}
+	case 409:
+		return -1, ErrOffsetMismatch
+	case 412:
+		return -1, ErrVersionMismatch
+	case 413:
+		return -1, ErrLargeUpload
+	default:
+		return -1, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+}
+
+func (c *Client) getUploadOffset(url string) (int64, error) {
 	req, err := http.NewRequest("HEAD", url, nil)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to resume upload of '%s': %s", c.filename, err)
+		return -1, err
 	}
 
-	req.Header.Set("Tus-Resumable", c.protocolVersion)
-
-	res, err := c.client.Do(req)
+	res, err := c.Do(req)
 
 	if err != nil {
-		return 0, fmt.Errorf("failed to resume upload of '%s': %s", c.filename, err)
+		return -1, err
 	}
 
 	switch res.StatusCode {
@@ -261,14 +201,14 @@ func (c *Client) uploadOffset(url string) (int64, error) {
 		if err == nil {
 			return i, nil
 		} else {
-			return 0, fmt.Errorf("failed to resume upload of '%s': can't parse upload offset.", c.filename)
+			return -1, err
 		}
 	case 403, 404, 410:
 		// file doesn't exists.
-		return -1, nil
+		return -1, ErrUploadNotFound
 	case 412:
-		return 0, fmt.Errorf("failed to resume upload of '%s': this client is incompatible with Tus server version %s.", c.filename, res.Header.Get("Tus-Version"))
+		return -1, ErrVersionMismatch
 	default:
-		return 0, fmt.Errorf("failed to resume upload of '%s': %d", c.filename, res.StatusCode)
+		return -1, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 }
