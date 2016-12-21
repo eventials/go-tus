@@ -18,7 +18,7 @@ type Upload struct {
 	Metadata    Metadata
 }
 
-// Size retuns the size of the upload body.
+// Size returns the size of the upload body.
 func (u *Upload) Size() int64 {
 	return u.size
 }
