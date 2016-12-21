@@ -1,10 +1,5 @@
 package tus
 
-import (
-	"log"
-	"os"
-)
-
 // Config provides a way to configure the Client depending on your needs.
 type Config struct {
 	// ChunkSize divide the file into chunks.
@@ -16,8 +11,6 @@ type Config struct {
 	// Store map an upload's fingerprint with the corresponding upload URL.
 	// If Resume is true the Store is required.
 	Store Store
-	// Logger is the logger to use internally, mostly for upload progress.
-	Logger *log.Logger
 }
 
 // DefaultConfig return the default Client configuration.
@@ -27,7 +20,6 @@ func DefaultConfig() *Config {
 		Resume:              false,
 		OverridePatchMethod: false,
 		Store:               nil,
-		Logger:              log.New(os.Stdout, "[tus] ", 0),
 	}
 }
 
@@ -35,10 +27,6 @@ func DefaultConfig() *Config {
 func (c *Config) Validate() error {
 	if c.ChunkSize < 1 {
 		return ErrChuckSize
-	}
-
-	if c.Logger == nil {
-		return ErrNilLogger
 	}
 
 	if c.Resume && c.Store == nil {

@@ -2,7 +2,6 @@ package tus
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -244,7 +243,6 @@ func (s *UploadTestSuite) TestResumeUpload() {
 		Resume:              true,
 		OverridePatchMethod: false,
 		Store:               NewMockStore(),
-		Logger:              log.New(os.Stdout, "[tus] ", 0),
 	}
 
 	client, err := NewClient(s.url, cfg)
