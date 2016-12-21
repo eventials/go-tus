@@ -18,6 +18,11 @@ func (u *Uploader) Abort() {
 	u.aborted = true
 }
 
+// IsAborted returns true if the upload was aborted.
+func (u *Uploader) IsAborted() bool {
+	return u.aborted
+}
+
 // Upload uploads the entire body to the server.
 func (u *Uploader) Upload() error {
 	for u.offset < u.upload.size && !u.aborted {
