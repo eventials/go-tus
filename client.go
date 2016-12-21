@@ -146,7 +146,7 @@ func (c *Client) uploadChunck(url string, body io.Reader, size int64, offset int
 	req, err := http.NewRequest(method, url, body)
 
 	if err != nil {
-		return -1, fmt.Errorf("failed to upload: %s", err)
+		return -1, err
 	}
 
 	req.Header.Set("Content-Type", "application/offset+octet-stream")
