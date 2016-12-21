@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConfingMissingStorage(t *testing.T) {
+func TestConfingMissingStore(t *testing.T) {
 	c := Config{
 		ChunkSize:           1048576 * 15, // 15 MB
 		Resume:              true,
 		OverridePatchMethod: false,
-		Storage:             nil,
+		Store:               nil,
 		Logger:              log.New(os.Stdout, "[tus] ", 0),
 	}
 
@@ -25,7 +25,7 @@ func TestConfingChunkSizeZero(t *testing.T) {
 		ChunkSize:           0,
 		Resume:              false,
 		OverridePatchMethod: false,
-		Storage:             nil,
+		Store:               nil,
 		Logger:              log.New(os.Stdout, "[tus] ", 0),
 	}
 
@@ -37,7 +37,7 @@ func TestConfingMissingLogger(t *testing.T) {
 		ChunkSize:           1048576 * 15, // 15 MB
 		Resume:              false,
 		OverridePatchMethod: false,
-		Storage:             nil,
+		Store:               nil,
 		Logger:              nil,
 	}
 

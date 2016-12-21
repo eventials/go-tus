@@ -2,9 +2,11 @@ package tus
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,14 +16,44 @@ import (
 	"github.com/tus/tusd/filestore"
 )
 
-type ClientTestSuite struct {
-	suite.Suite
-
-	ts  *httptest.Server
-	url string
+type MockStore struct {
+	m map[string]string
 }
 
-func (s *ClientTestSuite) SetupSuite() {
+func NewMockStore() Store {
+	return &MockStore{
+		make(map[string]string),
+	}
+}
+
+func (s *MockStore) Get(fingerprint string) (string, bool) {
+	url, ok := s.m[fingerprint]
+	return url, ok
+}
+
+func (s *MockStore) Set(fingerprint, url string) {
+	s.m[fingerprint] = url
+}
+
+func (s *MockStore) Delete(fingerprint string) {
+	delete(s.m, fingerprint)
+}
+
+func (s *MockStore) Close() {
+	for k := range s.m {
+		delete(s.m, k)
+	}
+}
+
+type UploadTestSuite struct {
+	suite.Suite
+
+	ts    *httptest.Server
+	store filestore.FileStore
+	url   string
+}
+
+func (s *UploadTestSuite) SetupSuite() {
 	store := filestore.FileStore{
 		Path: os.TempDir(),
 	}
@@ -43,134 +75,217 @@ func (s *ClientTestSuite) SetupSuite() {
 		panic(err)
 	}
 
+	s.store = store
 	s.ts = httptest.NewServer(http.StripPrefix("/uploads/", handler))
 	s.url = fmt.Sprintf("%s/uploads/", s.ts.URL)
 }
 
-func (s *ClientTestSuite) TearDownSuite() {
+func (s *UploadTestSuite) TearDownSuite() {
 	s.ts.Close()
 }
 
-func (s *ClientTestSuite) TestSmallUpload() {
+func (s *UploadTestSuite) TestSmallUploadFromFile() {
 	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
 
 	f, err := os.Create(file)
 	s.Nil(err)
+
+	defer f.Close()
 
 	err = f.Truncate(1048576) // 1 MB
 	s.Nil(err)
 
-	c, err := NewClient(s.url, file, nil)
+	client, err := NewClient(s.url, nil)
 	s.Nil(err)
 
-	err = c.Upload()
+	upload, err := NewUploadFromFile(f)
 	s.Nil(err)
+
+	uploader, err := client.CreateUpload(upload)
+	s.Nil(err)
+	s.NotNil(uploader)
+
+	err = uploader.Upload()
+	s.Nil(err)
+
+	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	s.EqualValues(1048576, fi.Size)
 }
 
-func (s *ClientTestSuite) TestLargeUpload() {
+func (s *UploadTestSuite) TestLargeUpload() {
 	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
 
 	f, err := os.Create(file)
 	s.Nil(err)
+
+	defer f.Close()
 
 	err = f.Truncate(1048576 * 150) // 150 MB
 	s.Nil(err)
 
-	c, err := NewClient(s.url, file, nil)
+	client, err := NewClient(s.url, nil)
 	s.Nil(err)
 
-	err = c.Upload()
+	upload, err := NewUploadFromFile(f)
 	s.Nil(err)
+
+	uploader, err := client.CreateUpload(upload)
+	s.Nil(err)
+	s.NotNil(uploader)
+
+	err = uploader.Upload()
+	s.Nil(err)
+
+	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	s.EqualValues(1048576*150, fi.Size)
 }
 
-func (s *ClientTestSuite) TestOverridePatchMethod() {
-	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
-
-	f, err := os.Create(file)
+func (s *UploadTestSuite) TestUploadFromBytes() {
+	client, err := NewClient(s.url, nil)
 	s.Nil(err)
 
-	err = f.Truncate(1048576) // 1 MB
+	upload := NewUploadFromBytes([]byte("1234567890"))
 	s.Nil(err)
 
-	conf := DefaultConfig()
-	conf.OverridePatchMethod = true
+	uploader, err := client.CreateUpload(upload)
+	s.Nil(err)
+	s.NotNil(uploader)
 
-	c, err := NewClient(s.url, file, conf)
+	err = uploader.Upload()
 	s.Nil(err)
 
-	err = c.Upload()
+	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
 	s.Nil(err)
+
+	s.EqualValues(10, fi.Size)
 }
 
-func (s *ClientTestSuite) TestConcurrentUploads() {
+func (s *UploadTestSuite) TestOverridePatchMethod() {
+	client, err := NewClient(s.url, nil)
+	s.Nil(err)
+
+	client.Config.OverridePatchMethod = true
+
+	upload := NewUploadFromBytes([]byte("1234567890"))
+	s.Nil(err)
+
+	uploader, err := client.CreateUpload(upload)
+	s.Nil(err)
+	s.NotNil(uploader)
+
+	err = uploader.Upload()
+	s.Nil(err)
+
+	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	s.EqualValues(10, fi.Size)
+}
+
+func (s *UploadTestSuite) TestConcurrentUploads() {
 	var wg sync.WaitGroup
 
-	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
-
-	f, err := os.Create(file)
+	client, err := NewClient(s.url, nil)
 	s.Nil(err)
 
-	err = f.Truncate(1048576) // 1 MB
-	s.Nil(err)
-
-	conf := DefaultConfig()
-	conf.Resume = false
-
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		wg.Add(1)
 
 		go func() {
 			defer wg.Done()
 
-			c, err := NewClient(s.url, file, conf)
+			file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().UnixNano())
+
+			f, err := os.Create(file)
 			s.Nil(err)
 
-			err = c.Upload()
+			defer f.Close()
+
+			err = f.Truncate(1048576 * 5) // 5 MB
 			s.Nil(err)
+
+			upload, err := NewUploadFromFile(f)
+			s.Nil(err)
+
+			uploader, err := client.CreateUpload(upload)
+			s.Nil(err)
+			s.NotNil(uploader)
+
+			err = uploader.Upload()
+			s.Nil(err)
+
+			fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+			s.Nil(err)
+
+			s.EqualValues(1048576*5, fi.Size)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func (s *ClientTestSuite) TestResumeUpload() {
+func (s *UploadTestSuite) TestResumeUpload() {
 	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
 
 	f, err := os.Create(file)
 	s.Nil(err)
 
+	defer f.Close()
+
 	err = f.Truncate(1048576 * 150) // 150 MB
 	s.Nil(err)
 
-	c, err := NewClient(s.url, file, nil)
+	cfg := &Config{
+		ChunkSize:           2 * 1024 * 1024,
+		Resume:              true,
+		OverridePatchMethod: false,
+		Store:               NewMockStore(),
+		Logger:              log.New(os.Stdout, "[tus] ", 0),
+	}
+
+	client, err := NewClient(s.url, cfg)
 	s.Nil(err)
+
+	upload, err := NewUploadFromFile(f)
+	s.Nil(err)
+
+	uploader, err := client.CreateUpload(upload)
+	s.Nil(err)
+	s.NotNil(uploader)
 
 	// This will stop the first upload.
 	go func() {
 		time.Sleep(250 * time.Millisecond)
-		c.Abort()
+		uploader.Abort()
 	}()
 
-	err = c.Upload()
+	err = uploader.Upload()
 	s.Nil(err)
 
-	// This should resume upload.
-	err = c.Upload()
+	s.True(uploader.aborted)
+
+	uploader, err = client.ResumeUpload(upload)
 	s.Nil(err)
+	s.NotNil(uploader)
+
+	err = uploader.Upload()
+	s.Nil(err)
+
+	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	s.EqualValues(1048576*150, fi.Size)
 }
 
-func (s *ClientTestSuite) TestUploadDir() {
-	c, err := NewClient(s.url, os.TempDir(), nil)
-	s.Nil(c)
-	s.NotNil(err)
+func TestUploadTestSuite(t *testing.T) {
+	suite.Run(t, new(UploadTestSuite))
 }
 
-func (s *ClientTestSuite) TestUploadInvalidFile() {
-	c, err := NewClient(s.url, "randomfile.txt", nil)
-	s.Nil(c)
-	s.NotNil(err)
-}
-
-func TestClientTestSuite(t *testing.T) {
-	suite.Run(t, new(ClientTestSuite))
+func uploadIdFromUrl(url string) string {
+	parts := strings.Split(url, "/")
+	return parts[len(parts)-1]
 }

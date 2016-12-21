@@ -1,12 +1,8 @@
 package tus
 
 import (
-	"fmt"
 	"log"
 	"os"
-
-	"github.com/eventials/go-tus/storage"
-	memstore "github.com/eventials/go-tus/storage/memory"
 )
 
 // Config provides a way to configure the Client depending on your needs.
@@ -17,22 +13,20 @@ type Config struct {
 	Resume bool
 	// OverridePatchMethod allow to by pass proxies sendind a POST request instead of PATCH.
 	OverridePatchMethod bool
-	// Storage is the backend to save upload progress.
-	// If Resume is true the Storage is required.
-	Storage storage.Storage
+	// Store map an upload's fingerprint with the corresponding upload URL.
+	// If Resume is true the Store is required.
+	Store Store
 	// Logger is the logger to use internally, mostly for upload progress.
 	Logger *log.Logger
 }
 
 // DefaultConfig return the default Client configuration.
 func DefaultConfig() *Config {
-	s, _ := memstore.NewMemoryStorage()
-
 	return &Config{
-		ChunkSize:           1048576 * 15, // 15 MB
-		Resume:              true,
+		ChunkSize:           2 * 1024 * 1024,
+		Resume:              false,
 		OverridePatchMethod: false,
-		Storage:             s,
+		Store:               nil,
 		Logger:              log.New(os.Stdout, "[tus] ", 0),
 	}
 }
@@ -40,15 +34,15 @@ func DefaultConfig() *Config {
 // Validate validates the custom configuration.
 func (c *Config) Validate() error {
 	if c.ChunkSize < 1 {
-		return fmt.Errorf("invalid configuration: ChunkSize must be greater than zero.")
+		return ErrChuckSize
 	}
 
 	if c.Logger == nil {
-		return fmt.Errorf("invalid configuration: Logger can't be nil.")
+		return ErrNilLogger
 	}
 
-	if c.Resume && c.Storage == nil {
-		return fmt.Errorf("invalid configuration: Storage can't be nil if Resume is enable.")
+	if c.Resume && c.Store == nil {
+		return ErrNilStore
 	}
 
 	return nil

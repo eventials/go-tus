@@ -5,16 +5,33 @@ A pure Go client for the [tus resumable upload protocol](http://tus.io/)
 ## Example
 
 ```go
-c, err := NewClient("http://localhost:1080/files/", "/videos/my-video.mp4", nil)
+package main
 
-if err != nil {
-    panic(err)
-}
+import (
+    "os"
+    "github.com/eventials/go-tus"
+)
 
-err = c.Upload()
+func main() {
+    f, err := os.Open("my-file.txt")
 
-if err != nil {
-    panic(err)
+    if err != nil {
+        panic(err)
+    }
+
+    defer f.Close()
+
+    // create the tus client.
+    client, _ := tus.NewClient("https://tus.example.org/files", nil)
+
+    // create an upload from a file.
+    upload, _ := tus.NewUploadFromFile(f)
+
+    // create the uploader.
+    uploader, _ := client.CreateUpload(upload)
+
+    // start the uploading process.
+    uploader.Upload()
 }
 ```
 
@@ -24,21 +41,21 @@ if err != nil {
 
 Checksum, Termination and Concatenation extensions are not implemented yet.
 
-This client allows to resume an upload if a Storage is used.
+This client allows to resume an upload if a Store is used.
 
-## Built in Storages
+## Built in Store
 
-Storages are used to save the progress of an upload.
+Store is used to map an upload's fingerprint with the corresponding upload URL.
 
 | Name | Backend | Dependencies |
 |:----:|:-------:|:------------:|
-| MemoryStorage | In-Memory | None |
+| MemoryStore | In-Memory | None |
 
 ## Future Work
 
-- [ ] SQLite storage
-- [ ] Redis storage
-- [ ] Memcached storage
+- [ ] SQLite store
+- [ ] Redis store
+- [ ] Memcached store
 - [ ] Checksum extension
 - [ ] Termination extension
 - [ ] Concatenation extension
