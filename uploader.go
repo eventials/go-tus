@@ -23,6 +23,16 @@ func (u *Uploader) IsAborted() bool {
 	return u.aborted
 }
 
+// Url returns the upload url.
+func (u *Uploader) Url() string {
+	return u.url
+}
+
+// Offset returns the current offset uploaded.
+func (u *Uploader) Offset() int64 {
+	return u.offset
+}
+
 // Upload uploads the entire body to the server.
 func (u *Uploader) Upload() error {
 	for u.offset < u.upload.size && !u.aborted {
