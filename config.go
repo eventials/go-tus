@@ -1,5 +1,9 @@
 package tus
 
+import (
+	"net/http"
+)
+
 // Config provides a way to configure the Client depending on your needs.
 type Config struct {
 	// ChunkSize divide the file into chunks.
@@ -11,6 +15,8 @@ type Config struct {
 	// Store map an upload's fingerprint with the corresponding upload URL.
 	// If Resume is true the Store is required.
 	Store Store
+	// Set custom header values used in all requests.
+	Header http.Header
 }
 
 // DefaultConfig return the default Client configuration.
@@ -20,6 +26,7 @@ func DefaultConfig() *Config {
 		Resume:              false,
 		OverridePatchMethod: false,
 		Store:               nil,
+		Header:              make(http.Header),
 	}
 }
 

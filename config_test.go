@@ -12,6 +12,7 @@ func TestConfingMissingStore(t *testing.T) {
 		Resume:              true,
 		OverridePatchMethod: false,
 		Store:               nil,
+		Header:              nil,
 	}
 
 	assert.NotNil(t, c.Validate())
@@ -23,6 +24,7 @@ func TestConfingChunkSizeZero(t *testing.T) {
 		Resume:              false,
 		OverridePatchMethod: false,
 		Store:               nil,
+		Header:              nil,
 	}
 
 	assert.NotNil(t, c.Validate())

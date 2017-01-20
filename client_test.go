@@ -243,6 +243,9 @@ func (s *UploadTestSuite) TestResumeUpload() {
 		Resume:              true,
 		OverridePatchMethod: false,
 		Store:               NewMockStore(),
+		Header: map[string][]string{
+			"X-Extra-Header": []string{"somevalue"},
+		},
 	}
 
 	client, err := NewClient(s.url, cfg)
