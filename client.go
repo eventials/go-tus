@@ -17,6 +17,7 @@ type Client struct {
 	Config  *Config
 	Url     string
 	Version string
+	Header  http.Header
 
 	client *http.Client
 }
@@ -31,16 +32,25 @@ func NewClient(url string, config *Config) (*Client, error) {
 		}
 	}
 
+	if config.Header == nil {
+		config.Header = make(http.Header)
+	}
+
 	return &Client{
 		Config:  config,
 		Url:     url,
 		Version: ProtocolVersion,
+		Header:  config.Header,
 
 		client: &http.Client{},
 	}, nil
 }
 
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
+	for k, v := range c.Header {
+		req.Header[k] = v
+	}
+
 	req.Header.Set("Tus-Resumable", ProtocolVersion)
 
 	return c.client.Do(req)
