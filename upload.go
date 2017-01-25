@@ -28,7 +28,7 @@ func (u *Upload) EncodedMetadata() string {
 	var buffer bytes.Buffer
 
 	for k, v := range u.Metadata {
-		buffer.WriteString(fmt.Sprintf("%s %s;", k, b64encode(v)))
+		buffer.WriteString(fmt.Sprintf("%s %s,", k, b64encode(v)))
 	}
 
 	return buffer.String()
