@@ -1,7 +1,6 @@
 package tus
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -96,7 +95,7 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	case 413:
 		return nil, ErrLargeUpload
 	default:
-		return nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return nil, &ClientError{res.StatusCode}
 	}
 }
 
@@ -187,7 +186,7 @@ func (c *Client) uploadChunck(url string, body io.Reader, size int64, offset int
 	case 413:
 		return -1, ErrLargeUpload
 	default:
-		return -1, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return -1, &ClientError{res.StatusCode}
 	}
 }
 
@@ -219,6 +218,6 @@ func (c *Client) getUploadOffset(url string) (int64, error) {
 	case 412:
 		return -1, ErrVersionMismatch
 	default:
-		return -1, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		return -1, &ClientError{res.StatusCode}
 	}
 }
