@@ -2,6 +2,7 @@ package tus
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
@@ -16,3 +17,11 @@ var (
 	ErrResumeNotEnabled  = errors.New("resuming not enabled.")
 	ErrFingerprintNotSet = errors.New("fingerprint not set.")
 )
+
+type ClientError struct {
+	Code int
+}
+
+func (c *ClientError) Error() string {
+	return fmt.Sprintf("unexpected status code: %d", c.Code)
+}
