@@ -22,6 +22,6 @@ type ClientError struct {
 	Code int
 }
 
-func (c *ClientError) Error() string {
+func (c ClientError) Error() string {
 	return fmt.Sprintf("unexpected status code: %d", c.Code)
 }
