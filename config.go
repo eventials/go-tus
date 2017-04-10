@@ -17,6 +17,9 @@ type Config struct {
 	Store Store
 	// Set custom header values used in all requests.
 	Header http.Header
+	// Set custom Transport settings.
+	// Use this if you ahe behind a proxy.
+	Transport *http.Transport
 }
 
 // DefaultConfig return the default Client configuration.
@@ -27,6 +30,7 @@ func DefaultConfig() *Config {
 		OverridePatchMethod: false,
 		Store:               nil,
 		Header:              make(http.Header),
+		Transport:           nil,
 	}
 }
 
