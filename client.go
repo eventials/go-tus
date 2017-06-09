@@ -240,6 +240,6 @@ func newClientError(res *http.Response) ClientError {
 	body, _ := ioutil.ReadAll(res.Body)
 	return ClientError{
 		Code: res.StatusCode,
-		Body: string(body),
+		Body: body,
 	}
 }
