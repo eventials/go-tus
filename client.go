@@ -2,6 +2,7 @@ package tus
 
 import (
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -106,7 +107,7 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	case 413:
 		return nil, ErrLargeUpload
 	default:
-		return nil, ClientError{res.StatusCode}
+		return nil, newClientError(res)
 	}
 }
 
@@ -198,7 +199,7 @@ func (c *Client) uploadChunck(url string, body io.Reader, size int64, offset int
 	case 413:
 		return -1, ErrLargeUpload
 	default:
-		return -1, ClientError{res.StatusCode}
+		return -1, newClientError(res)
 	}
 }
 
@@ -231,6 +232,14 @@ func (c *Client) getUploadOffset(url string) (int64, error) {
 	case 412:
 		return -1, ErrVersionMismatch
 	default:
-		return -1, ClientError{res.StatusCode}
+		return -1, newClientError(res)
+	}
+}
+
+func newClientError(res *http.Response) ClientError {
+	body, _ := ioutil.ReadAll(res.Body)
+	return ClientError{
+		Code: res.StatusCode,
+		Body: string(body),
 	}
 }

@@ -20,6 +20,7 @@ var (
 
 type ClientError struct {
 	Code int
+	Body string
 }
 
 func (c ClientError) Error() string {
