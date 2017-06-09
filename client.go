@@ -90,6 +90,7 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case 201:
@@ -181,6 +182,7 @@ func (c *Client) uploadChunck(url string, body io.Reader, size int64, offset int
 	if err != nil {
 		return -1, err
 	}
+	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case 204:
@@ -212,6 +214,7 @@ func (c *Client) getUploadOffset(url string) (int64, error) {
 	if err != nil {
 		return -1, err
 	}
+	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case 200:
