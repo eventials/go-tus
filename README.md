@@ -50,6 +50,7 @@ Store is used to map an upload's fingerprint with the corresponding upload URL.
 | Name | Backend | Dependencies |
 |:----:|:-------:|:------------:|
 | MemoryStore | In-Memory | None |
+| LeveldbStore | LevelDB | [goleveldb](https://github.com/syndtr/goleveldb) |
 
 ## Future Work
 
