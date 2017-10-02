@@ -5,11 +5,18 @@ import (
 )
 
 type Uploader struct {
-	client  *Client
-	url     string
-	upload  *Upload
-	offset  int64
-	aborted bool
+	client     *Client
+	url        string
+	upload     *Upload
+	offset     int64
+	aborted    bool
+	uploadSubs []chan Upload
+	notifyChan chan bool
+}
+
+// Subscribes to progress updates.
+func (u *Uploader) NotifyUploadProgress(c chan Upload) {
+	u.uploadSubs = append(u.uploadSubs, c)
 }
 
 // Abort aborts the upload process.
@@ -72,16 +79,37 @@ func (u *Uploader) UploadChunck() error {
 
 	u.offset = newOffset
 
+	u.upload.updateProgress(u.offset)
+
+	u.notifyChan <- true
+
 	return nil
+}
+
+// Waits for a signal to broadcast to all subscribers
+func (u *Uploader) broadcastProgress() {
+	for _ = range u.notifyChan {
+		for _, c := range u.uploadSubs {
+			c <- *u.upload
+		}
+	}
 }
 
 // NewUploader creates a new Uploader.
 func NewUploader(client *Client, url string, upload *Upload, offset int64) *Uploader {
-	return &Uploader{
+	notifyChan := make(chan bool)
+
+	uploader := &Uploader{
 		client,
 		url,
 		upload,
 		offset,
 		false,
+		nil,
+		notifyChan,
 	}
+
+	go uploader.broadcastProgress()
+
+	return uploader
 }
