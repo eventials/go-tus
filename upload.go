@@ -11,11 +11,36 @@ import (
 type Metadata map[string]string
 
 type Upload struct {
-	stream io.ReadSeeker
-	size   int64
+	stream   io.ReadSeeker
+	size     int64
+	offset   int64
+	finished bool
 
 	Fingerprint string
 	Metadata    Metadata
+}
+
+// Updates the Upload information based on offset
+func (u *Upload) UpdateProgress(offset int64) {
+	u.offset = offset
+	if u.size == offset {
+		u.finished = true
+	}
+}
+
+// Returns whether this upload is finished
+func (u *Upload) Finished() bool {
+	return u.finished
+}
+
+// Returns the progress in a percentage
+func (u *Upload) Progress() int64 {
+	return (u.offset * 100) / u.size
+}
+
+// Offset returns the current offset
+func (u *Upload) Offset() int64 {
+	return u.offset
 }
 
 // Size returns the size of the upload body.
