@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"fmt"
+	netUrl "net/url"
 )
 
 const (
@@ -97,8 +97,16 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	switch res.StatusCode {
 	case 201:
 		url := res.Header.Get("Location")
-		fmt.Println(url)
-		fmt.Println(res.Header)
+
+		parsedUrl, err:= netUrl.Parse(url)
+		if err != nil{
+			return nil, ErrUrlNotRecognized
+		}
+		if parsedUrl.Scheme == ""{
+			parsedUrl.Scheme = "http"
+			url = parsedUrl.String()
+		}
+
 		if c.Config.Resume {
 			c.Config.Store.Set(u.Fingerprint, url)
 		}
