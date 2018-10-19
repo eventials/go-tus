@@ -13,7 +13,7 @@ func TestEncodedMetadata(t *testing.T) {
 	u := NewUploadFromBytes([]byte(""))
 	u.Metadata["filename"] = "foobar.txt"
 	enc := u.EncodedMetadata()
-	assert.Equal(t, "filename Zm9vYmFyLnR4dA==,", enc)
+	assert.Equal(t, "filename Zm9vYmFyLnR4dA==", enc)
 }
 
 func TestNewUploadFromFile(t *testing.T) {
