@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"fmt"
 )
 
 const (
@@ -96,7 +97,8 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	switch res.StatusCode {
 	case 201:
 		url := res.Header.Get("Location")
-
+		fmt.Println(url)
+		fmt.Println(res.Header)
 		if c.Config.Resume {
 			c.Config.Store.Set(u.Fingerprint, url)
 		}
