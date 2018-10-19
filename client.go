@@ -98,13 +98,18 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	case 201:
 		url := res.Header.Get("Location")
 
-		parsedUrl, err:= netUrl.Parse(url)
+		baseUrl, err:= netUrl.Parse(c.Url)
 		if err != nil{
 			return nil, ErrUrlNotRecognized
 		}
-		if parsedUrl.Scheme == ""{
-			parsedUrl.Scheme = "http"
-			url = parsedUrl.String()
+
+		newUrl, err:= netUrl.Parse(url)
+		if err != nil{
+			return nil, ErrUrlNotRecognized
+		}
+		if newUrl.Scheme == ""{
+			newUrl.Scheme = baseUrl.Scheme
+			url = newUrl.String()
 		}
 
 		if c.Config.Resume {
