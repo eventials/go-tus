@@ -4,8 +4,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	netUrl "net/url"
+	"strconv"
 )
 
 const (
@@ -98,16 +98,16 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	case 201:
 		url := res.Header.Get("Location")
 
-		baseUrl, err:= netUrl.Parse(c.Url)
-		if err != nil{
+		baseUrl, err := netUrl.Parse(c.Url)
+		if err != nil {
 			return nil, ErrUrlNotRecognized
 		}
 
-		newUrl, err:= netUrl.Parse(url)
-		if err != nil{
+		newUrl, err := netUrl.Parse(url)
+		if err != nil {
 			return nil, ErrUrlNotRecognized
 		}
-		if newUrl.Scheme == ""{
+		if newUrl.Scheme == "" {
 			newUrl.Scheme = baseUrl.Scheme
 			url = newUrl.String()
 		}
