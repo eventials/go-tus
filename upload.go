@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 type Metadata map[string]string
@@ -46,13 +47,13 @@ func (u *Upload) Size() int64 {
 
 // EncodedMetadata encodes the upload metadata.
 func (u *Upload) EncodedMetadata() string {
-	var buffer bytes.Buffer
+	var encoded []string
 
 	for k, v := range u.Metadata {
-		buffer.WriteString(fmt.Sprintf("%s %s,", k, b64encode(v)))
+		encoded = append(encoded, fmt.Sprintf("%s %s", k, b64encode(v)))
 	}
 
-	return buffer.String()
+	return strings.Join(encoded, ",")
 }
 
 // NewUploadFromFile creates a new Upload from an os.File.
@@ -67,7 +68,7 @@ func NewUploadFromFile(f *os.File) (*Upload, error) {
 		"filename": fi.Name(),
 	}
 
-	fingerprint := fmt.Sprintf("%s-%d-%d", fi.Name(), fi.Size(), fi.ModTime())
+	fingerprint := fmt.Sprintf("%s-%d-%s", fi.Name(), fi.Size(), fi.ModTime())
 
 	return NewUpload(f, fi.Size(), metadata, fingerprint), nil
 }
