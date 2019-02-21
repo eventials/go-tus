@@ -18,8 +18,8 @@ type Config struct {
 	// Set custom header values used in all requests.
 	Header http.Header
 	// Set custom Transport settings.
-	// Use this if you ahe behind a proxy.
-	Transport *http.Transport
+	// Use this if you are behind a proxy.
+	Transport http.RoundTripper
 }
 
 // DefaultConfig return the default Client configuration.
