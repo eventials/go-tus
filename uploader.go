@@ -2,6 +2,7 @@ package tus
 
 import (
 	"bytes"
+	"sync"
 )
 
 type Uploader struct {
@@ -9,6 +10,7 @@ type Uploader struct {
 	url        string
 	upload     *Upload
 	offset     int64
+	lock       sync.RWMutex
 	aborted    bool
 	uploadSubs []chan Upload
 	notifyChan chan bool
@@ -22,11 +24,15 @@ func (u *Uploader) NotifyUploadProgress(c chan Upload) {
 // Abort aborts the upload process.
 // It doens't abort the current chunck, only the remaining.
 func (u *Uploader) Abort() {
+	u.lock.Lock()
 	u.aborted = true
+	u.lock.Unlock()
 }
 
 // IsAborted returns true if the upload was aborted.
 func (u *Uploader) IsAborted() bool {
+	u.lock.RLock()
+	defer u.lock.RUnlock()
 	return u.aborted
 }
 
@@ -42,14 +48,11 @@ func (u *Uploader) Offset() int64 {
 
 // Upload uploads the entire body to the server.
 func (u *Uploader) Upload() error {
-	for u.offset < u.upload.size && !u.aborted {
-		err := u.UploadChunck()
-
-		if err != nil {
+	for u.offset < u.upload.size && !u.IsAborted() {
+		if err := u.UploadChunck(); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -100,13 +103,11 @@ func NewUploader(client *Client, url string, upload *Upload, offset int64) *Uplo
 	notifyChan := make(chan bool)
 
 	uploader := &Uploader{
-		client,
-		url,
-		upload,
-		offset,
-		false,
-		nil,
-		notifyChan,
+		client:     client,
+		url:        url,
+		upload:     upload,
+		offset:     offset,
+		notifyChan: notifyChan,
 	}
 
 	go uploader.broadcastProgress()
