@@ -36,7 +36,10 @@ func TestUploaderAbort(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			var u Uploader
+			var upload Upload
+			var url string
+			var c Client
+			u := NewUploader(&c, url, &upload, 0)
 			var wg sync.WaitGroup
 			wg.Add(tc.count)
 			for i := 0; i < tc.count; i++ {

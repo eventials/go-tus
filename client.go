@@ -1,6 +1,7 @@
 package tus
 
 import (
+	"context"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -170,7 +171,13 @@ func (c *Client) CreateOrResumeUpload(u *Upload) (*Uploader, error) {
 	return nil, err
 }
 
-func (c *Client) uploadChunck(url string, body io.Reader, size int64, offset int64) (int64, error) {
+func (c *Client) uploadChunck(
+	ctx context.Context,
+	url string,
+	body io.Reader,
+	size int64,
+	offset int64,
+) (int64, error) {
 	var method string
 
 	if !c.Config.OverridePatchMethod {
@@ -193,7 +200,7 @@ func (c *Client) uploadChunck(url string, body io.Reader, size int64, offset int
 		req.Header.Set("X-HTTP-Method-Override", "PATCH")
 	}
 
-	res, err := c.Do(req)
+	res, err := c.Do(req.WithContext(ctx))
 
 	if err != nil {
 		return -1, err

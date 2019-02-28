@@ -265,7 +265,7 @@ func (s *UploadTestSuite) TestResumeUpload() {
 	}()
 
 	err = uploader.Upload()
-	s.Nil(err)
+	s.NotNil(err)
 
 	s.True(uploader.aborted)
 

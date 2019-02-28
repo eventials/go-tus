@@ -14,6 +14,7 @@ var (
 	ErrVersionMismatch   = errors.New("protocol version mismatch.")
 	ErrOffsetMismatch    = errors.New("upload offset mismatch.")
 	ErrUploadNotFound    = errors.New("upload not found.")
+	ErrUploadAborted     = errors.New("upload is aborted.")
 	ErrResumeNotEnabled  = errors.New("resuming not enabled.")
 	ErrFingerprintNotSet = errors.New("fingerprint not set.")
 	ErrUrlNotRecognized  = errors.New("url not recognized")
