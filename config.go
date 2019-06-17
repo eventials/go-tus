@@ -29,7 +29,7 @@ func DefaultConfig() *Config {
 		OverridePatchMethod: false,
 		Store:               nil,
 		Header:              make(http.Header),
-		HttpClient:					 nil,
+		HttpClient:          nil,
 	}
 }
 
