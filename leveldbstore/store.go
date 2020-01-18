@@ -37,5 +37,5 @@ func (s *LeveldbStore) Delete(fingerprint string) {
 }
 
 func (s *LeveldbStore) Close() {
-	s.Close()
+	s.db.Close()
 }
