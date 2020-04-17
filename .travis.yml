@@ -1,12 +1,11 @@
 language: go
 go:
-  - 1.8
-  - 1.9
+  - 1.12
+  - 1.13
+  - 1.14
   - tip
 install:
-  - go get github.com/stretchr/testify
-  - go get github.com/tus/tusd
-  - go get github.com/syndtr/goleveldb/leveldb
+  - go mod download
 script: go test -v ./...
 notifications:
   email:
