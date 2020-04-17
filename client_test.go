@@ -1,6 +1,7 @@
 package tus
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +12,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/tus/tusd"
-	"github.com/tus/tusd/filestore"
+	"github.com/tus/tusd/pkg/filestore"
+	"github.com/tus/tusd/pkg/handler"
 )
 
 type MockStore struct {
@@ -57,11 +58,11 @@ func (s *UploadTestSuite) SetupSuite() {
 		Path: os.TempDir(),
 	}
 
-	composer := tusd.NewStoreComposer()
+	composer := handler.NewStoreComposer()
 
 	store.UseIn(composer)
 
-	handler, err := tusd.NewHandler(tusd.Config{
+	handler, err := handler.NewHandler(handler.Config{
 		BasePath:                "/uploads/",
 		StoreComposer:           composer,
 		MaxSize:                 0,
@@ -107,7 +108,10 @@ func (s *UploadTestSuite) TestSmallUploadFromFile() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	retrievedUpload, err := s.store.GetUpload(context.Background(), uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	fi, err := retrievedUpload.GetInfo(context.Background())
 	s.Nil(err)
 
 	s.EqualValues(1048576, fi.Size)
@@ -137,7 +141,10 @@ func (s *UploadTestSuite) TestLargeUpload() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	retrievedUpload, err := s.store.GetUpload(context.Background(), uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	fi, err := retrievedUpload.GetInfo(context.Background())
 	s.Nil(err)
 
 	s.EqualValues(1048576*150, fi.Size)
@@ -157,7 +164,10 @@ func (s *UploadTestSuite) TestUploadFromBytes() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	retrievedUpload, err := s.store.GetUpload(context.Background(), uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	fi, err := retrievedUpload.GetInfo(context.Background())
 	s.Nil(err)
 
 	s.EqualValues(10, fi.Size)
@@ -179,7 +189,10 @@ func (s *UploadTestSuite) TestOverridePatchMethod() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	retrievedUpload, err := s.store.GetUpload(context.Background(), uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	fi, err := retrievedUpload.GetInfo(context.Background())
 	s.Nil(err)
 
 	s.EqualValues(10, fi.Size)
@@ -217,7 +230,10 @@ func (s *UploadTestSuite) TestConcurrentUploads() {
 			err = uploader.Upload()
 			s.Nil(err)
 
-			fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+			retrievedUpload, err := s.store.GetUpload(context.Background(), uploadIdFromUrl(uploader.url))
+			s.Nil(err)
+
+			fi, err := retrievedUpload.GetInfo(context.Background())
 			s.Nil(err)
 
 			s.EqualValues(1048576*5, fi.Size)
@@ -276,7 +292,10 @@ func (s *UploadTestSuite) TestResumeUpload() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	retrievedUpload, err := s.store.GetUpload(context.Background(), uploadIdFromUrl(uploader.url))
+	s.Nil(err)
+
+	fi, err := retrievedUpload.GetInfo(context.Background())
 	s.Nil(err)
 
 	s.EqualValues(1048576*150, fi.Size)
