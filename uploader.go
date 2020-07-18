@@ -90,6 +90,9 @@ func (u *Uploader) UploadChunck() error {
 func (u *Uploader) broadcastProgress() {
 	for _ = range u.notifyChan {
 		for _, c := range u.uploadSubs {
+			if u.IsAborted() {
+				return
+			}
 			c <- *u.upload
 		}
 	}
