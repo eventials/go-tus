@@ -1,6 +1,7 @@
 package tus
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +12,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/tus/tusd"
-	"github.com/tus/tusd/filestore"
+	"github.com/tus/tusd/pkg/filestore"
+	tusd "github.com/tus/tusd/pkg/handler"
 )
 
 type MockStore struct {
@@ -84,6 +85,10 @@ func (s *UploadTestSuite) TearDownSuite() {
 }
 
 func (s *UploadTestSuite) TestSmallUploadFromFile() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
 
 	f, err := os.Create(file)
@@ -107,13 +112,20 @@ func (s *UploadTestSuite) TestSmallUploadFromFile() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	up, err := s.store.GetUpload(ctx, uploadIDFromURL(uploader.url))
+	s.Nil(err)
+
+	fi, err := up.GetInfo(ctx)
 	s.Nil(err)
 
 	s.EqualValues(1048576, fi.Size)
 }
 
 func (s *UploadTestSuite) TestLargeUpload() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
 
 	f, err := os.Create(file)
@@ -137,13 +149,20 @@ func (s *UploadTestSuite) TestLargeUpload() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	up, err := s.store.GetUpload(ctx, uploadIDFromURL(uploader.url))
+	s.Nil(err)
+
+	fi, err := up.GetInfo(ctx)
 	s.Nil(err)
 
 	s.EqualValues(1048576*150, fi.Size)
 }
 
 func (s *UploadTestSuite) TestUploadFromBytes() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	client, err := NewClient(s.url, nil)
 	s.Nil(err)
 
@@ -157,13 +176,20 @@ func (s *UploadTestSuite) TestUploadFromBytes() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	up, err := s.store.GetUpload(ctx, uploadIDFromURL(uploader.url))
+	s.Nil(err)
+
+	fi, err := up.GetInfo(ctx)
 	s.Nil(err)
 
 	s.EqualValues(10, fi.Size)
 }
 
 func (s *UploadTestSuite) TestOverridePatchMethod() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	client, err := NewClient(s.url, nil)
 	s.Nil(err)
 
@@ -179,13 +205,20 @@ func (s *UploadTestSuite) TestOverridePatchMethod() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	up, err := s.store.GetUpload(ctx, uploadIDFromURL(uploader.url))
+	s.Nil(err)
+
+	fi, err := up.GetInfo(ctx)
 	s.Nil(err)
 
 	s.EqualValues(10, fi.Size)
 }
 
 func (s *UploadTestSuite) TestConcurrentUploads() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	var wg sync.WaitGroup
 
 	client, err := NewClient(s.url, nil)
@@ -217,7 +250,10 @@ func (s *UploadTestSuite) TestConcurrentUploads() {
 			err = uploader.Upload()
 			s.Nil(err)
 
-			fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+			up, err := s.store.GetUpload(ctx, uploadIDFromURL(uploader.url))
+			s.Nil(err)
+
+			fi, err := up.GetInfo(ctx)
 			s.Nil(err)
 
 			s.EqualValues(1048576*5, fi.Size)
@@ -228,6 +264,10 @@ func (s *UploadTestSuite) TestConcurrentUploads() {
 }
 
 func (s *UploadTestSuite) TestResumeUpload() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	file := fmt.Sprintf("%s/%d", os.TempDir(), time.Now().Unix())
 
 	f, err := os.Create(file)
@@ -276,7 +316,10 @@ func (s *UploadTestSuite) TestResumeUpload() {
 	err = uploader.Upload()
 	s.Nil(err)
 
-	fi, err := s.store.GetInfo(uploadIdFromUrl(uploader.url))
+	up, err := s.store.GetUpload(ctx, uploadIDFromURL(uploader.url))
+	s.Nil(err)
+
+	fi, err := up.GetInfo(ctx)
 	s.Nil(err)
 
 	s.EqualValues(1048576*150, fi.Size)
@@ -286,7 +329,7 @@ func TestUploadTestSuite(t *testing.T) {
 	suite.Run(t, new(UploadTestSuite))
 }
 
-func uploadIdFromUrl(url string) string {
+func uploadIDFromURL(url string) string {
 	parts := strings.Split(url, "/")
 	return parts[len(parts)-1]
 }
