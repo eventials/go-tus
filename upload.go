@@ -32,6 +32,9 @@ func (u *Upload) Finished() bool {
 
 // Returns the progress in a percentage.
 func (u *Upload) Progress() int64 {
+	if u.size == 0 {
+		return 1
+	}
 	return (u.offset * 100) / u.size
 }
 
