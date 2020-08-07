@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	netUrl "net/url"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -323,6 +325,42 @@ func (s *UploadTestSuite) TestResumeUpload() {
 	s.Nil(err)
 
 	s.EqualValues(1048576*150, fi.Size)
+}
+
+func (s *UploadTestSuite) TestUploadLocation() {
+	client, err := NewClient(s.url, nil)
+	s.Nil(err)
+	sourceURL, err := netUrl.Parse(s.url)
+	s.Nil(err)
+
+	s.T().Run("Location is a full URL", func(t *testing.T) {
+		location := "https://serveit.com/upload/123"
+		resourceURL, err := client.resolveLocationURL(location)
+		s.Nil(err)
+		s.EqualValues(location, resourceURL.String())
+	})
+
+	s.T().Run("Location is a URL without scheme", func(t *testing.T) {
+		location := "//serveit.com/upload/123"
+		resourceURL, err := client.resolveLocationURL(location)
+		s.Nil(err)
+		s.EqualValues(sourceURL.Scheme+":"+location, resourceURL.String())
+	})
+
+	s.T().Run("Location is an absolute path", func(t *testing.T) {
+		location := "/upload/123"
+		resourceURL, err := client.resolveLocationURL(location)
+		s.Nil(err)
+		s.EqualValues(sourceURL.Scheme+"://"+sourceURL.Host+location, resourceURL.String())
+	})
+
+	s.T().Run("Location is a relative path", func(t *testing.T) {
+		location := "somewhere/123"
+		resourceURL, err := client.resolveLocationURL(location)
+		s.Nil(err)
+		s.EqualValues(sourceURL.Scheme+"://"+sourceURL.Host+path.Join(sourceURL.Path, location), resourceURL.String())
+	})
+
 }
 
 func TestUploadTestSuite(t *testing.T) {

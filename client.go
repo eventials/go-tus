@@ -1,6 +1,7 @@
 package tus
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -90,27 +91,18 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 
 	switch res.StatusCode {
 	case 201:
-		url := res.Header.Get("Location")
+		location := res.Header.Get("Location")
 
-		baseUrl, err := netUrl.Parse(c.Url)
+		newURL, err := c.resolveLocationURL(location)
 		if err != nil {
-			return nil, ErrUrlNotRecognized
-		}
-
-		newUrl, err := netUrl.Parse(url)
-		if err != nil {
-			return nil, ErrUrlNotRecognized
-		}
-		if newUrl.Scheme == "" {
-			newUrl.Scheme = baseUrl.Scheme
-			url = newUrl.String()
+			return nil, err
 		}
 
 		if c.Config.Resume {
-			c.Config.Store.Set(u.Fingerprint, url)
+			c.Config.Store.Set(u.Fingerprint, newURL.String())
 		}
 
-		return NewUploader(c, url, u, 0), nil
+		return NewUploader(c, newURL.String(), u, 0), nil
 	case 412:
 		return nil, ErrVersionMismatch
 	case 413:
@@ -118,6 +110,20 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 	default:
 		return nil, newClientError(res)
 	}
+}
+
+func (c *Client) resolveLocationURL(location string) (*netUrl.URL, error) {
+	baseURL, err := netUrl.Parse(c.Url)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid URL '%s'", c.Url)
+	}
+
+	locationURL, err := netUrl.Parse(location)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid Location header value for a Creation '%s': %s", location, err.Error())
+	}
+	newURL := baseURL.ResolveReference(locationURL)
+	return newURL, nil
 }
 
 // ResumeUpload resumes the upload if already created, otherwise it will return an error.
