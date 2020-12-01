@@ -12,6 +12,8 @@ type Config struct {
 	Resume bool
 	// OverridePatchMethod allow to by pass proxies sendind a POST request instead of PATCH.
 	OverridePatchMethod bool
+	// RelativeURL allows support for a relative Location header in the creation response
+	RelativeURL bool
 	// Store map an upload's fingerprint with the corresponding upload URL.
 	// If Resume is true the Store is required.
 	Store Store
