@@ -264,7 +264,6 @@ func (s *UploadTestSuite) TestConcurrentUploads() {
 }
 
 func (s *UploadTestSuite) TestResumeUpload() {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -323,6 +322,25 @@ func (s *UploadTestSuite) TestResumeUpload() {
 	s.Nil(err)
 
 	s.EqualValues(1048576*150, fi.Size)
+}
+
+func (s *UploadTestSuite) TestCreateUploadRelativeURL() {
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header().Add("Location", "xyz")
+			rw.WriteHeader(http.StatusCreated)
+		},
+	))
+	defer srv.Close()
+
+	cfg := DefaultConfig()
+	cfg.RelativeURL = true
+
+	client, err := NewClient(srv.URL, cfg)
+	s.NoError(err)
+	upload, err := client.CreateUpload(NewUploadFromBytes([]byte("test")))
+	s.NoError(err)
+	s.Equal(srv.URL + "/xyz", upload.url)
 }
 
 func TestUploadTestSuite(t *testing.T) {
