@@ -264,7 +264,7 @@ func (s *UploadTestSuite) TestConcurrentUploads() {
 }
 
 func (s *UploadTestSuite) TestResumeUpload() {
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -338,7 +338,7 @@ func (s *UploadTestSuite) TestCreateUploadRelativeURL() {
 	s.NoError(err)
 	upload, err := client.CreateUpload(NewUploadFromBytes([]byte("test")))
 	s.NoError(err)
-	s.Equal(srv.URL + "/xyz", upload.url)
+	s.Equal(srv.URL+"/xyz", upload.url)
 }
 
 func TestUploadTestSuite(t *testing.T) {
