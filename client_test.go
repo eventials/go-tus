@@ -325,6 +325,22 @@ func (s *UploadTestSuite) TestResumeUpload() {
 	s.EqualValues(1048576*150, fi.Size)
 }
 
+func (s *UploadTestSuite) TestCreateUploadRelativeURL() {
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header().Add("Location", "xyz")
+			rw.WriteHeader(http.StatusCreated)
+		},
+	))
+	defer srv.Close()
+
+	client, err := NewClient(srv.URL, DefaultConfig())
+	s.NoError(err)
+	upload, err := client.CreateUpload(NewUploadFromBytes([]byte("test")))
+	s.NoError(err)
+	s.Equal(srv.URL+"/xyz", upload.url)
+}
+
 func TestUploadTestSuite(t *testing.T) {
 	suite.Run(t, new(UploadTestSuite))
 }

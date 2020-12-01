@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	netUrl "net/url"
+	"path"
 	"strconv"
 )
 
@@ -102,10 +103,9 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 			return nil, ErrUrlNotRecognized
 		}
 		if newUrl.Scheme == "" {
-			newUrl.Scheme = baseUrl.Scheme
-			url = newUrl.String()
+			baseUrl.Path = path.Join(baseUrl.Path, url)
+			url = baseUrl.String()
 		}
-
 		if c.Config.Resume {
 			c.Config.Store.Set(u.Fingerprint, url)
 		}
