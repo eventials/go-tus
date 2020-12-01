@@ -264,6 +264,7 @@ func (s *UploadTestSuite) TestConcurrentUploads() {
 }
 
 func (s *UploadTestSuite) TestResumeUpload() {
+	
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
