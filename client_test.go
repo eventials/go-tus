@@ -333,10 +333,7 @@ func (s *UploadTestSuite) TestCreateUploadRelativeURL() {
 	))
 	defer srv.Close()
 
-	cfg := DefaultConfig()
-	cfg.RelativeURL = true
-
-	client, err := NewClient(srv.URL, cfg)
+	client, err := NewClient(srv.URL, DefaultConfig())
 	s.NoError(err)
 	upload, err := client.CreateUpload(NewUploadFromBytes([]byte("test")))
 	s.NoError(err)
