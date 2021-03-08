@@ -67,7 +67,7 @@ func NewUploadFromFile(f *os.File) (*Upload, error) {
 		"filename": fi.Name(),
 	}
 
-	fingerprint := fmt.Sprintf("%s-%d-%d", fi.Name(), fi.Size(), fi.ModTime())
+	fingerprint := fmt.Sprintf("%s-%d-%s", fi.Name(), fi.Size(), fi.ModTime())
 
 	return NewUpload(f, fi.Size(), metadata, fingerprint), nil
 }
