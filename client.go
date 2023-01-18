@@ -1,6 +1,7 @@
 package tus
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -107,6 +108,9 @@ func (c *Client) CreateUpload(u *Upload) (*Uploader, error) {
 		return nil, ErrVersionMismatch
 	case 413:
 		return nil, ErrLargeUpload
+	case 200:
+		resBody, _ := ioutil.ReadAll(res.Body)
+		return nil, errors.New(string(resBody))
 	default:
 		return nil, newClientError(res)
 	}
