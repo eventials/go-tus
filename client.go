@@ -21,7 +21,7 @@ type Client struct {
 	Version string
 	Header  http.Header
 
-	client *http.Client
+	client HTTPClient
 }
 
 // NewClient creates a new tus client.

@@ -18,7 +18,7 @@ type Config struct {
 	// Set custom header values used in all requests.
 	Header http.Header
 	// HTTP Client
-	HttpClient *http.Client
+	HttpClient HTTPClient
 }
 
 // DefaultConfig return the default Client configuration.
