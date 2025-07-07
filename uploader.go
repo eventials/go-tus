@@ -42,6 +42,12 @@ func (u *Uploader) Offset() int64 {
 
 // Upload uploads the entire body to the server.
 func (u *Uploader) Upload() error {
+	if u.offset == u.upload.size {
+		u.upload.updateProgress(u.offset)
+		u.notifyChan <- true
+		return nil
+	}
+	
 	for u.offset < u.upload.size && !u.aborted {
 		err := u.UploadChunck()
 
