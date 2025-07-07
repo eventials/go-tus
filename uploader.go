@@ -86,6 +86,11 @@ func (u *Uploader) UploadChunck() error {
 	return nil
 }
 
+// Close close the notifyChan so that broadcastProgress goroutine can exit
+func (u *Uploader) Close() {
+	close(u.notifyChan)
+}
+
 // Waits for a signal to broadcast to all subscribers
 func (u *Uploader) broadcastProgress() {
 	for _ = range u.notifyChan {
