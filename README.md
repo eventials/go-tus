@@ -28,7 +28,11 @@ func main() {
     upload, _ := tus.NewUploadFromFile(f)
 
     // create the uploader.
-    uploader, _ := client.CreateUpload(upload)
+    uploader, err := client.CreateUpload(upload)
+    if err != nil {
+        panic(err)
+    }
+    defer uploader.Close()
 
     // start the uploading process.
     uploader.Upload()
@@ -106,8 +110,10 @@ func main() {
 			fmt.Println("Error", err)
 			fmt.Println("Trying again in 10 seg")
 			time.Sleep(time.Second * 10)
+            uploader.Close()
 			continue
 		}
+        uploader.Close()
 		break
 	}
 	// If after all attemps there's an error panic!
